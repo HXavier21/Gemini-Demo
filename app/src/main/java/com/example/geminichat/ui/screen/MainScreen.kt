@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -37,7 +39,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
@@ -57,6 +62,7 @@ private const val TAG = "MainScreen"
 fun MainScreen(
     mainScreenViewModel: MainScreenViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val mutableConversationFlowList = mainScreenViewModel.mutableConversationsFlowList
     val updatedIndex by mainScreenViewModel.updateIndex.collectAsState()
     val isGenerating by mainScreenViewModel.isGenerating.collectAsState()
@@ -114,13 +120,14 @@ fun MainScreen(
                         colors = TextFieldDefaults.colors(
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent
-                        ),
+                        )
                     )
                     Box(
                         modifier = Modifier
                             .padding(end = 20.dp),
                         contentAlignment = Alignment.Center
                     ) {
+                        val focusManager = LocalFocusManager.current
                         Icon(
                             imageVector = if (!isGenerating) Icons.Default.ArrowUpward
                             else Icons.Default.Stop,
@@ -138,6 +145,7 @@ fun MainScreen(
                                 .clickable(
                                     enabled = !isGenerating,
                                     onClick = {
+                                        focusManager.clearFocus()
                                         mainScreenViewModel.changeGenerateState()
                                         val tempMessage = message
                                         message = ""
@@ -149,7 +157,7 @@ fun MainScreen(
                                         )
                                         mainScreenViewModel.updateScreen()
                                         mainScreenViewModel.viewModelScope.launch {
-                                            mainScreenViewModel.sendMessage(tempMessage)
+                                            mainScreenViewModel.sendMessage(tempMessage,context)
                                         }
                                     },
                                     indication = null,

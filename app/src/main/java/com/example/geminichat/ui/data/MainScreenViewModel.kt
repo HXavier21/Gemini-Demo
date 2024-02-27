@@ -1,10 +1,13 @@
 package com.example.geminichat.ui.data
 
+import android.content.Context
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import com.example.geminichat.BuildConfig
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.coroutines.coroutineContext
 
 private const val TAG = "MainScreenViewModel"
 
@@ -24,9 +27,13 @@ class MainScreenViewModel : ViewModel() {
     val updateIndex: MutableStateFlow<Int> = MutableStateFlow(0)
     val isGenerating: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
-    suspend fun sendMessage(message: String) {
-        val response = chat.sendMessage(message).text ?: "Something go wrong."
-        addConversation(Conversation("GEMINI", response))
+    suspend fun sendMessage(message: String, context: Context) {
+        try {
+            val response = chat.sendMessage(message).text ?: "Something go wrong."
+            addConversation(Conversation("GEMINI", response))
+        } catch (e: Exception) {
+            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+        }
         changeGenerateState()
     }
 
