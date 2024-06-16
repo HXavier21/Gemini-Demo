@@ -1,7 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-    id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin") apply true
+    id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -52,10 +53,22 @@ android {
 }
 
 dependencies {
-    implementation (libs.androidx.material.icons.extended)
-    implementation(libs.generativeai)
-    implementation (libs.androidx.lifecycle.viewmodel.compose)
 
+    implementation(libs.tasks.genai)
+    implementation(libs.generativeai)
+
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
+
+    implementation(libs.androidx.room.runtime)
+    annotationProcessor(libs.androidx.room.compiler)
+    // To use Kotlin annotation processing tool (kapt)
+    ksp(libs.androidx.room.compiler)
+    // optional - Kotlin Extensions and Coroutines support fo
+    implementation(libs.androidx.room.ktx)
+
+    implementation(libs.compose.markdown)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
