@@ -5,8 +5,8 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import com.example.geminichat.BuildConfig
+import com.example.geminichat.util.ModelUtil
 import com.google.ai.client.generativeai.GenerativeModel
-import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,20 +15,16 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "MainScreenViewModel"
 
+enum class AvailableModel {
+    GEMINI, DEEP_SEEK, GEMMA
+}
+
 class MainScreenViewModel : ViewModel() {
 
-    private val generativeModel by lazy {
-        GenerativeModel(
-            modelName = "gemini-1.5-flash",
-            apiKey = BuildConfig.apiKey
-        )
-    }
-
     private val chat by lazy {
-        generativeModel.startChat()
+        ModelUtil.geminiModel.startChat()
     }
 
-    private lateinit var llmInference: LlmInference
 
     private val mSentencesFlowList: MutableStateFlow<MutableList<Sentence>> =
         MutableStateFlow(mutableListOf())
@@ -36,44 +32,35 @@ class MainScreenViewModel : ViewModel() {
     val isGenerating: MutableStateFlow<Boolean> = MutableStateFlow(false)
     val textToSelect: MutableStateFlow<String> = MutableStateFlow("")
     val generatedText: MutableStateFlow<String> = MutableStateFlow("")
-    private val isOnline: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    private val isOnline: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
     suspend fun initializeGemini(context: Context) {
         withContext(Dispatchers.IO) {
-//            try {
-//                val response =
-//                    generativeModel.generateContent("hello").text ?: "Something go wrong."
-//                Log.d(TAG, "init: $response")
-//            } catch (e: Exception) {
             try {
-                isOnline.update { false }
-                val options = LlmInference.LlmInferenceOptions.builder()
-                    .setModelPath("/data/local/tmp/llm/gemma-2b-it-cpu-int4.bin")
-                    .setMaxTokens(1000)
-                    .setTopK(40)
-                    .setTemperature(0.8f)
-                    .setRandomSeed(101)
-                    .setResultListener { partialResult, done ->
-                        if (done) {
-                            updateSentence(Sentence("GEMINI", generatedText.value))
-                            changeGenerateState()
-                        } else {
-                            setGeneratedText(partialResult)
-                        }
-                    }
-                    .build()
-                llmInference = LlmInference.createFromOptions(context, options)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Switch to offline model", Toast.LENGTH_SHORT)
-                        .show()
-                }
+                ModelUtil.initGemmaModel(
+                    updateSentence = { updateSentence(Sentence("GEMINI", generatedText.value)) },
+                    changeGenerateState = { changeGenerateState() },
+                    setGeneratedText = { setGeneratedText(it) },
+                    context = context
+                )
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Log.e(TAG, "initializeGemini: ", e)
-                    Toast.makeText(context, "Error in loading offline model", Toast.LENGTH_LONG)
+                    Toast.makeText(context, "Error in loading offline model", Toast.LENGTH_SHORT)
                         .show()
                 }
-                /*}*/
+            }
+            try {
+                val response =
+                    ModelUtil.geminiModel.generateContent("hello").text ?: "Something go wrong."
+                Log.d(TAG, "init: $response")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Switch to online model", Toast.LENGTH_SHORT)
+                        .show()
+                }
+                isOnline.update { true }
+            } catch (e: Exception) {
+                Log.e(TAG, "initializeGemini: ", e)
             }
         }
     }
@@ -101,7 +88,7 @@ class MainScreenViewModel : ViewModel() {
             } else {
                 clearGeneratedText()
                 addSentence(Sentence("GEMINI", ""))
-                llmInference.generateResponseAsync(message)
+                ModelUtil.generateResponseAsync(message)
             }
         }
     }

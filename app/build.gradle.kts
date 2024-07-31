@@ -29,6 +29,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -53,6 +54,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.mmkv)
 
     implementation(libs.tasks.genai)
     implementation(libs.generativeai)
