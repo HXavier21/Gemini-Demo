@@ -66,7 +66,7 @@ fun ChatField(
             item {
                 ChatItem(
                     name = sentence.role,
-                    message = sentence.message.ifEmpty { generatedText },
+                    message = sentence.content.ifEmpty { generatedText },
                     mainScreenViewModel = mainScreenViewModel,
                     onNavigateToSelectText = onNavigateToSelectText
                 )

@@ -7,15 +7,17 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.serialization.Serializable
 
 @Entity
 data class Conversation(
     @PrimaryKey(autoGenerate = true) val id: Int, val sentences: List<Sentence>
 )
 
-
+@Serializable
 data class Sentence(
-    val role: String, val message: String
+    val role: String,
+    val content: String
 )
 
 @Dao
