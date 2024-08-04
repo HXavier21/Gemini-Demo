@@ -112,7 +112,7 @@ object ModelUtil {
             when (model) {
                 AvailableModel.DeepSeek -> {
                     try {
-                        deepSeekChat.sendMessageWithHistory(message) {
+                        deepSeekChat.sendMessageWithHistory(message, true) {
                             onResponseCallback(it)
                         }
                     } catch (e: Exception) {

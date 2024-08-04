@@ -1,8 +1,6 @@
 package com.example.geminichat.ui.data
 
 import android.content.Context
-import android.util.Log
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import com.example.geminichat.util.AvailableModel
 import com.example.geminichat.util.ModelUtil
@@ -71,14 +69,17 @@ class MainScreenViewModel : ViewModel() {
 //                    }
 //                }
 //                changeGenerateState()
+                clearGeneratedText()
+                addSentence(Sentence("GEMINI", ""))
                 ModelUtil.onlineModelGenerateMessage(
                     AvailableModel.DeepSeek,
                     message
                 ) {
                     setGeneratedText(it)
-                    updateSentence(Sentence("GEMINI", it))
-                    changeGenerateState()
                 }
+
+                updateSentence(Sentence("GEMINI", generatedText.value))
+                changeGenerateState()
             } else {
                 clearGeneratedText()
                 addSentence(Sentence("GEMINI", ""))

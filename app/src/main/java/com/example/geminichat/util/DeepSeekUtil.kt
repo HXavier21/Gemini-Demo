@@ -14,7 +14,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.IOException
+import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
+
 
 private const val TAG = "DeepSeekChatUtil"
 
@@ -46,9 +49,13 @@ object DeepSeekUtil {
     class Chat {
         private val history: MutableList<Sentence> = mutableListOf()
 
-        suspend fun sendMessageWithHistory(message: String, onResponseCallback: (String) -> Unit) {
+        suspend fun sendMessageWithHistory(
+            message: String,
+            stream: Boolean = false,
+            onResponseCallback: (String) -> Unit
+        ) {
             history.add(Sentence("user", message))
-            sendMessage(history) {
+            sendMessage(history, stream) {
                 history.add(Sentence("assistant", it))
                 onResponseCallback(it)
             }
@@ -57,7 +64,11 @@ object DeepSeekUtil {
 
     private const val DEEP_SEEK_API_KEY = BuildConfig.deepSeekApiKey
 
-    suspend fun sendMessage(sentences: List<Sentence>, onResponseCallback: (String) -> Unit) {
+    suspend fun sendMessage(
+        sentences: List<Sentence>,
+        stream: Boolean = false,
+        onResponseCallback: (String) -> Unit,
+    ) {
         withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient().newBuilder()
@@ -67,19 +78,53 @@ object DeepSeekUtil {
                     .build()
                 val mediaType = "application/json".toMediaTypeOrNull()
                 val body =
-                    encodeDeepSeekRequestBody(DeepSeekRequestBody(messages = sentences)).toRequestBody(
+                    encodeDeepSeekRequestBody(
+                        DeepSeekRequestBody(
+                            messages = sentences,
+                            stream = stream
+                        )
+                    ).toRequestBody(
                         mediaType
                     )
-                Log.d(
-                    TAG,
-                    "sendMessage: ${encodeDeepSeekRequestBody(DeepSeekRequestBody(sentences))}"
-                )
                 val request = Request.Builder().url("https://api.deepseek.com/chat/completions")
                     .method("POST", body).addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json")
                     .addHeader("Authorization", "Bearer $DEEP_SEEK_API_KEY").build()
                 val response = client.newCall(request).execute()
-                onResponseCallback(decodeDeepSeekResponse(response.body?.string() ?: ""))
+                when (stream) {
+                    true -> {
+                        val responseBody = response.body
+                        if (null != responseBody) {
+                            try {
+                                responseBody.byteStream().use { inputStream ->
+                                    val buffer = ByteArray(1024)
+                                    var len = 0
+                                    while ((inputStream.read(buffer).also { len = it }) != -1) {
+                                        val str =
+                                            String(buffer, 0, len, Charset.defaultCharset())
+                                        str.replace(" ".toRegex(), "") // 去除所有空格
+                                        Log.i(TAG, "streamChat inputStream.read $str")
+                                        str.split("data:").last().trim().let {
+                                            if (it != "[DONE]") {
+                                                onResponseCallback(
+                                                    decodeDeepSeekResponse(
+                                                        it, true
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (ioException: IOException) {
+                                ioException.printStackTrace()
+                            }
+                        }
+                    }
+
+                    false -> {
+                        onResponseCallback(decodeDeepSeekResponse(response.body?.string() ?: ""))
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "sendMessage: ", e)
                 onResponseCallback("Something go wrong.")
@@ -87,14 +132,19 @@ object DeepSeekUtil {
         }
     }
 
-    suspend fun sendMessage(sentence: Sentence, onResponseCallback: (String) -> Unit) {
-        sendMessage(listOf(sentence), onResponseCallback)
+    suspend fun sendMessage(
+        sentence: Sentence,
+        stream: Boolean = false,
+        onResponseCallback: (String) -> Unit,
+    ) {
+        sendMessage(listOf(sentence), stream, onResponseCallback)
     }
 
     private fun encodeDeepSeekRequestBody(
         deepSeekRequestBody: DeepSeekRequestBody
     ): String {
-        return Json { encodeDefaults = true }.encodeToString(deepSeekRequestBody)
+        val json = Json { encodeDefaults = true }
+        return json.encodeToString(deepSeekRequestBody)
     }
 
     private fun encodeDeepSeekMessage(sentences: List<Sentence>): String {
@@ -105,13 +155,21 @@ object DeepSeekUtil {
         return encodeDeepSeekMessage(listOf(sentences))
     }
 
-    private fun decodeDeepSeekResponse(response: String): String {
+    private fun decodeDeepSeekResponse(response: String, stream: Boolean = false): String {
         Log.d(TAG, "decodeDeepSeekResponse: $response")
-        val jsonObject = JSONObject(response)
-        val choicesArray = jsonObject.getJSONArray("choices")
-        val firstChoice = choicesArray.getJSONObject(0)
-        val messageObject = firstChoice.getJSONObject("message")
-        return messageObject.getString("content")
+        try {
+            val jsonObject = JSONObject(response)
+            val choicesArray = jsonObject.getJSONArray("choices")
+            val firstChoice = choicesArray.getJSONObject(0)
+            val messageObject = when (stream) {
+                true -> firstChoice.getJSONObject("delta")
+                false -> firstChoice.getJSONObject("message")
+            }
+            return messageObject.getString("content")
+        } catch (e: Exception) {
+            Log.e(TAG, "decodeDeepSeekResponse: ", e)
+            return ""
+        }
     }
 
     fun createChat(): Chat {
